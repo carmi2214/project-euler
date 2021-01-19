@@ -1,18 +1,20 @@
-import {blue, bold, green, yellow} from "chalk";
+import {bgYellowBright, black, green} from "chalk";
+
+type MutationNumber = 0 | 1 | -1;
 
 const factorial = (num: number): number => {
     if (num === 0) return 1;
     return num * factorial(num - 1);
 };
 
-const generateVariousDoubleOnesMatrix = (length: number, onesLeft: number = 2): number[][] => {
+const generateVariousDoubleOnesMatrix = (length: number, onesLeft: number = 2): MutationNumber[][] => {
     if (length <= 0) return [];
     if (length === 1) return onesLeft > 0 ? [[1]] : [[0]];
-    if (onesLeft <= 0) return [new Array(length).fill(0)];
-    let matrix: number[][] = [];
+    if (onesLeft <= 0) return [new Array<MutationNumber>(length).fill(0)];
+    let matrix: MutationNumber[][] = [];
     if (onesLeft === 1) {
         for (let i = 0; i < length; i++) {
-            const currentOption = new Array(length).fill(0);
+            const currentOption = new Array<MutationNumber>(length).fill(0);
             currentOption[i] = 1;
             matrix.push(currentOption);
         }
@@ -22,12 +24,12 @@ const generateVariousDoubleOnesMatrix = (length: number, onesLeft: number = 2): 
         matrix = [
             ...(length <= 2 && onesLeft >= 2 ? [] : zeroBeginningMatrix.map(array => [0, ...array])),
             ...oneBeginningMatrix.map(array => [1, ...array]),
-        ];
+        ] as MutationNumber[][];
     }
     return matrix;
 };
 
-const generateMutationMatrix = (size: number) => {
+const generateMutationMatrix = (size: number): MutationNumber[][] => {
     const variousDoubleOnesMatrix = generateVariousDoubleOnesMatrix(size);
     const variousDoubleOnesMatrixDuplicate = variousDoubleOnesMatrix.map(array => array.slice());
     for (let i = 0; i < variousDoubleOnesMatrix.length; i++) {
@@ -40,6 +42,17 @@ const generateMutationMatrix = (size: number) => {
     return [...variousDoubleOnesMatrix, ...variousDoubleOnesMatrixDuplicate];
 };
 
+const applyMutation = (tuple: number[], payment: number, mutation: MutationNumber[]): number[] => {
+    const mutatedTuple = [...tuple];
+    for (let i = 0; i < mutation.length; i++) {
+        if (mutation[i] !== 0) {
+            mutatedTuple[i] += payment * mutation[i];
+        }
+    }
+
+    return mutatedTuple;
+};
+
 const verifySumCondition = (tuple: number[]) => {
     const sum = Math.round(tuple.reduce((a, b) => a + b));
     if (sum !== tuple.length) {
@@ -50,55 +63,51 @@ const verifySumCondition = (tuple: number[]) => {
 const calculateP = (tuple: number[]) =>
     tuple.reduce((previous, current, index) => previous * (current ** (index + 1)));
 
-const getBestTuple = (tuple: number[], payment: number, indent = '', exact = 20): number[] => {
-    if (exact === 0) return tuple;
+const getBestTuple = (tuple: number[], mutationMatrix: MutationNumber[][], payment: number, precisionLevel: number): number[] => {
+    if (precisionLevel === 0) return tuple;
     let bestTuple = [...tuple];
     let bestP = calculateP(bestTuple);
     let foundBetterTuple = false;
 
-    const mutationMatrix = generateMutationMatrix(bestTuple.length);
     for (const mutation of mutationMatrix) {
-        const currentTuple = [...tuple];
-        for (let i = 0; i < mutation.length; i++) {
-            if (mutation[i] !== 0) {
-                currentTuple[i] += payment * mutation[i];
-            }
-        }
-
+        const currentTuple = applyMutation(tuple, payment, mutation);
         const currentP = calculateP(currentTuple);
-        console.log(`${indent}${currentTuple} - ${blue(currentP)}`);
 
         if (currentP > bestP) {
             bestTuple = currentTuple;
             bestP = currentP;
             foundBetterTuple = true;
-            console.log(green(`${indent}found better P! it is ${currentP}`));
         }
     }
 
-    if (!foundBetterTuple) console.log(yellow(`${indent}didn't find a better tuple than ${tuple}`));
-    return getBestTuple(bestTuple, foundBetterTuple ? payment : payment / 2, indent + (foundBetterTuple ? '' : ' '), exact - 1);
+    const nextPayment = foundBetterTuple ? payment : payment / 10;
+    return getBestTuple(bestTuple, mutationMatrix, nextPayment, precisionLevel - 1);
 };
 
 export const run = (): void => {
-    let tuple: number[] = [1, 1, 1, 1, 1, 1];
-    let bestP = calculateP(tuple);
+    const payment = 1 / 10;
+    const minimumTupleSize = 2;
+    const maximumTupleSize = 15;
+    const precisionLevel = 80;
 
-    const currentPayment = 1 / 10;
+    let sumOfP = 0;
 
-    if (currentPayment < 1) {
-        const currentTuple = getBestTuple(tuple, currentPayment, ' ');
-        const currentP = calculateP(currentTuple);
-        console.log(bold(`${currentTuple} - ${blue(currentP)}`));
+    for (let tupleSize = minimumTupleSize; tupleSize <= maximumTupleSize; tupleSize++) {
+        const currentTuple: number[] = new Array(tupleSize).fill(1);
+        const mutationMatrix = generateMutationMatrix(currentTuple.length);
 
-        if (currentP > bestP) {
-            tuple = currentTuple;
-            bestP = currentP;
-            console.log(bold(green(`found significantly better P! it is ${bestP}`)));
-        }
+        const bestTuple = getBestTuple(currentTuple, mutationMatrix, payment, precisionLevel);
+        const currentP = calculateP(bestTuple);
 
-        verifySumCondition(tuple);
+        verifySumCondition(bestTuple);
+        sumOfP += currentP;
+
+        console.log(bestTuple);
+        console.log(`P = ${green(currentP)}\n`);
     }
 
-    console.log(tuple);
+    console.log(`Sum of all P's: ${bgYellowBright(black(sumOfP))}`);
+    console.log(`size is between ${minimumTupleSize} and ${maximumTupleSize}.`);
+    console.log(`payment is ${payment}`);
+    console.log(`precisionLevel is ${precisionLevel}`);
 };
